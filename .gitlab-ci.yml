@@ -1,0 +1,102 @@
+# include:
+#   # - template: Terraform.latest.gitlab-ci.yml
+#   - template: Jobs/SAST-IaC.gitlab-ci.yml
+  
+variables:
+  TF_ROOT: ${CI_PROJECT_DIR}
+  TF_ADDRESS: ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/terraform/state/dev
+  
+
+cache:
+  key: dev
+  paths:
+    - ${TF_ROOT}/.terraform
+
+# before_script:
+# - cd ${TF_ROOT}
+# - terraform workspace select default
+# - terraform init -reconfigure
+
+stages:
+# - test
+- validate
+- plan
+- apply
+- destroy
+
+# kics-iac-sast:
+#   stage: test
+  # image: docker.io/ankitdwivedi74/iac-gitlab-cicd:latest
+  # script:
+  #   - cd ${TF_ROOT}
+    # - terraform init
+    # - kics scan
+  # artifacts:
+  #   paths:
+  #     - gl-sast-report.json
+  #   reports:
+  #     junit: gl-sast-report.json
+
+validate:
+  environment:
+    name: dev
+  stage: validate
+  script:
+    - terraform init -reconfigure
+    - terraform validate
+  when: manual
+  tags:
+    - devops
+
+plan:
+  stage: plan
+  environment:
+    name: dev
+  script:
+    - terraform init -reconfigure
+    - terraform plan -lock=false -out="planfile" 
+  dependencies:
+    - validate
+  tags:
+    - devops
+  artifacts:
+    name: plan
+    paths:
+      - planfile
+    reports:
+      terraform: planfile
+
+  when: manual
+
+apply:
+  stage: apply
+  environment:
+    name: dev
+  script:
+    - terraform init -reconfigure
+    - terraform apply -lock=false "planfile" 
+    # - terraform output -raw ip>${TF_ROOT}/ip.txt
+  dependencies:
+    - plan
+  tags:
+    - devops
+  when: manual
+
+  # artifacts:
+  #   name: apply
+  #   paths:
+  #     - ${TF_ROOT}/ip.txt
+
+destroy:
+  stage: destroy
+  environment:
+    name: dev
+  script:
+    - terraform init -reconfigure
+    - terraform destroy -lock=false -auto-approve 
+  dependencies:
+    - plan
+    - apply
+  tags:
+    - devops
+  when: manual
