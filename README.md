@@ -17,3 +17,5 @@ This project demonstrates how to deploy an NGINX web server on AWS Fargate using
 
 - **ECS Cluster, Task Definition & Service:**  
   An ECS cluster is created to run our application on Fargate. 
+
+![Architecture Diagram](/Flowchart/image.png)
