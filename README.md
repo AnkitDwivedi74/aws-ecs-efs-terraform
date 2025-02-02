@@ -1,52 +1,19 @@
+# Deploying an NGINX Application on Fargate with EFS
 
-## File Breakdown
+## Overview
 
-### 1. **variables.tf**
-Defines all configurable parameters like region, VPC CIDR, ECS task size, and EFS throughput mode.
+This project demonstrates how to deploy an NGINX web server on AWS Fargate using ECS, with a twist: instead of storing the NGINX configuration inside the container image, the configuration is stored externally in an Amazon EFS (Elastic File System). This allows you to update the configuration without rebuilding your container image.
 
-### 2. **data.tf**
-Retrieves information about the default VPC, its subnets, and the latest Ubuntu AMI from Canonical.
+### Key Components
 
+- **VPC & Subnets:**  
+  We leverage the default VPC and its subnets for networking. This ensures that our resources have the necessary connectivity and that they use the existing AWS networking setup.
 
-Creates:
-- A security group for EFS.
-- An EFS file system with a lifecycle policy.
-- Mount targets in all default subnets.
-- An EFS access point with its root directory set to `/nginx/conf.d`.
+- **EFS File System & Access Point:**  
+  An Amazon EFS file system is created to store our NGINX configuration. An EFS access point is configured with its root set to `/nginx/conf.d`, which isolates the configuration files. This directory will contain our `default.conf` file that NGINX uses to serve the website.
 
-### 5. **ec2-helper.tf**
-Creates an EC2 instance (the configuration uploader) that:
-- Uses an Ubuntu AMI.
-- Mounts the EFS file system.
-- Creates the `/nginx/conf.d` directory.
-- Writes the custom NGINX configuration file (`default.conf`) to that directory.
-- Unmounts the EFS after ensuring the file is written.
+- **Temporary EC2 Instance (Configuration Uploader):**  
+  A small, temporary EC2 instance is launched for one purpose only: to mount the EFS file system, create the required directory structure, and upload the custom NGINX configuration file. This instance is not part of the production workload; it’s only here to ensure that the EFS volume is pre-populated with the configuration the container needs.
 
-
-Defines IAM roles for ECS:
-- **ECS Task Execution Role:** Grants ECS permissions to pull container images, send logs, and use ECS Exec.
-- **ECS Task Role:** Grants in-container permissions (e.g., for EFS access) and attaches the AmazonElasticFileSystemClientReadWriteAccess policy.
-- Also attaches an inline policy to the execution role for ECS Exec functionality.
-
-Uses data sources to reference the default VPC and subnets. (In this example, we’re using the default VPC provided by AWS.)
-Creates:
-- An ECS Cluster.
-- A security group for ECS tasks to allow HTTP traffic.
-- An ECS Task Definition that defines a container running NGINX. The container mounts the EFS volume (via the access point) at `/etc/nginx/conf.d`, so that NGINX loads the custom configuration.
-- An ECS Service that runs on Fargate in public subnets with a public IP and has ECS Exec enabled for debugging.
-
-### 8. **outputs.tf**
-Defines outputs that provide:
-- The ECS cluster ID.
-- The ECS service name.
-- The public IP of the EC2 configuration uploader (for debugging if needed).
-
-## How to Deploy
-
-1. **Clone the Repository:**  
-   Clone this Terraform project to your local machine and navigate into the project directory.
-
-2. **Initialize Terraform:**  
-   Run the following command in your terminal:
-   ```bash
-   terraform init
+- **ECS Cluster, Task Definition & Service:**  
+  An ECS cluster is created to run our application on Fargate. 
